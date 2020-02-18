@@ -1,6 +1,3 @@
-# std
-import itertools
-
 # 3p
 import numpy as np
 
