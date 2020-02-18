@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "snake-cube"
+version = "0.1.0"
+description = ""
+authors = ["Francisco-Pierre Puig <puig.franciscopierre@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+numpy = "^1.18.1"
+
+[tool.poetry.dev-dependencies]
+black = {version = "^19.10b0", allow-prereleases = true}
+pytest = "^5.3.5"
+pytest-cov = "^2.8.1"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"

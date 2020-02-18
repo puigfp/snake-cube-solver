@@ -1,0 +1,10 @@
+# poetry
+/.venv
+*.egg-info
+
+# python
+__pycache__/
+
+# pytest
+/.pytest_cache
+/.benchmarks
