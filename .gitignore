@@ -1,10 +1,13 @@
 # poetry
-/.venv
-*.egg-info
+.venv/
+*.egg-info/
 
 # python
 __pycache__/
 
 # pytest
-/.pytest_cache
-/.benchmarks
+.pytest_cache/
+.benchmarks/
+
+# rust
+target/
