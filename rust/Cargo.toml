@@ -1,0 +1,15 @@
+[package]
+name = "snake-cube"
+version = "0.1.0"
+authors = ["Francisco-Pierre Puig <puig.franciscopierre@gmail.com>"]
+edition = "2018"
+
+[lib]
+name = "lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "snake-cube"
+path = "src/main.rs"
+
+[dependencies]
