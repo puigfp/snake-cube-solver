@@ -10,6 +10,7 @@ pub enum Orientation {
     Right,
 }
 
+// Direction = Orientation + coef (+1 or -1)
 pub struct Direction(Orientation, isize);
 
 impl Direction {
@@ -22,7 +23,7 @@ impl Direction {
             Direction(Front, d) if d == -1 => "back",
             Direction(Right, d) if d == 1 => "right",
             Direction(Right, d) if d == -1 => "left",
-            _ => panic!("a direction shouldn't be 0"),
+            Direction(_, d) => panic!("d should be +1 or -1, not {}", d),
         }
     }
 }
@@ -54,75 +55,76 @@ fn scale(s: isize, a: [isize; 3]) -> [isize; 3] {
     [s * a[0], s * a[1], s * a[2]]
 }
 
-pub fn solve(
-    snake: &Vec<usize>,
-    size: isize,
-) -> (Vec<[isize; 3]>, Vec<Direction>) {
-    let mut position: Vec<[isize; 3]> = vec![[0, 0, 0]];
-    let mut partial_solution: Vec<Direction> = vec![];
-    solve_rec(snake, size, &mut partial_solution, &mut position);
-    (position, partial_solution)
+fn snake_size(snake: &Vec<usize>) -> usize {
+    let length = snake.iter().sum::<usize>() + 1;
+    let size = (length as f64).powf(1. / 3.).round() as usize;
+    if size.pow(3) != length {
+        println!("{} {}", (length as f64).powf(1. / 3.), length);
+        panic!("{} isn't a valid snake length", length);
+    }
+    size
 }
 
-fn update_position(
-    position: &mut Vec<[isize; 3]>,
-    direction: &Direction,
-    n: usize,
-    size: isize,
+fn valid_partial_solution(
+    snake: &Vec<usize>,
+    size: usize,
+    partial_solution: &Vec<Direction>,
 ) -> bool {
-    let Direction(o, d) = direction;
+    // we assume that successive directions of the solution are orthogonal
+    // to one another
 
-    assert_eq!(position.len() >= 1, true);
-    let mut current = position[position.len() - 1];
-    let mut ok = true;
-
-    for _ in 0..n {
-        let next = add(current, scale(*d, delta_orientation(&o)));
-        ok = ok && !position.contains(&next);
-        position.push(next);
-        current = next;
-    }
-
-    let mut min = [0, 0, 0];
-    let mut max = [0, 0, 0];
-
-    for p in position.iter() {
-        for i in 0..3 {
-            if p[i] < min[i] {
-                min[i] = p[i];
+    // compute positions array: there should be no collisions
+    let mut position = vec![[0, 0, 0]];
+    for (length, Direction(o, d)) in snake.iter().zip(partial_solution.iter()) {
+        for _ in 0..*length {
+            let next = add(
+                position[position.len() - 1],
+                scale(*d, delta_orientation(&o)),
+            );
+            if position.contains(&next) {
+                return false;
             }
-            if p[i] > max[i] {
-                max[i] = p[i];
-            }
+            position.push(next);
         }
     }
 
-    for i in 0..3 {
-        ok = ok && (max[i] - min[i]) < size;
+    // snake should fit in a size*size*size cube
+    let min = (0..3).map(|i| position.iter().map(|p| p[i]).min().unwrap());
+    let max = (0..3).map(|i| position.iter().map(|p| p[i]).max().unwrap());
+
+    if min
+        .zip(max)
+        .map(|(a, b)| b - a < size as isize)
+        .collect::<Vec<_>>()
+        .contains(&false)
+    {
+        return false;
     }
 
-    if !ok {
-        for _ in 0..n {
-            position.pop();
-        }
-    }
+    true
+}
 
-    ok
+pub fn solve(snake: &Vec<usize>) -> Vec<Direction> {
+    let mut partial_solution: Vec<Direction> = vec![];
+    let size = snake_size(snake);
+    solve_rec(snake, size, &mut partial_solution);
+    partial_solution
 }
 
 fn solve_rec(
     snake: &Vec<usize>,
-    size: isize,
+    size: usize,
     partial_solution: &mut Vec<Direction>,
-    position: &mut Vec<[isize; 3]>,
 ) -> bool {
-    use Orientation::*;
+    if !valid_partial_solution(snake, size, partial_solution) {
+        return false;
+    }
 
     if partial_solution.len() == snake.len() {
         return true;
     }
 
-    let i = partial_solution.len();
+    use Orientation::*;
 
     for o in &[Front, Right, Up] {
         if partial_solution.len() >= 1
@@ -131,17 +133,11 @@ fn solve_rec(
             continue;
         }
         for d in &[1, -1] {
-            let direction = Direction(o.clone(), *d);
-            if update_position(position, &direction, snake[i], size) {
-                partial_solution.push(direction);
-                if solve_rec(snake, size, partial_solution, position) {
-                    return true;
-                }
-                partial_solution.pop();
-                for _ in 0..snake[i] {
-                    position.pop();
-                }
+            partial_solution.push(Direction(o.clone(), *d));
+            if solve_rec(snake, size, partial_solution) {
+                return true;
             }
+            partial_solution.pop();
         }
     }
 
