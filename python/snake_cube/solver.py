@@ -17,48 +17,11 @@ directions_names = {
     (0, 0, -1): "down",
 }
 
-invariant_transformations = np.array([
-    # symmetries
-    # x/y plane
-    [
-        [1, 0, 0],
-        [0, 1, 0],
-        [0, 0, -1],
-    ],
-    # x/z plane
-    [
-        [1, 0, 0],
-        [0, -1, 0],
-        [0, 0, 1],
-    ],
-    # y/z plane
-    [
-        [-1, 0, 0],
-        [0, 1, 0],
-        [0, 0, 1],
-    ],
-    # rotations
-    # around x axis
-    [
-        [1, 0, 0],
-        [0, 0, 1],
-        [0, -1, 0],
-    ],
-    # around y axis
-    [
-        [0, 0, 1],
-        [0, 1, 0],
-        [-1, 0, 0],
-    ],
-    # around z axis
-    [
-        [0, 1, 0],
-        [-1, 0, 0],
-        [0, 0, 1],
-    ],
-])
-# fmt: on
-
+def snake_size(snake):
+    length = np.sum(snake) + 1
+    size = np.int(np.round(length **(1/3)))
+    assert size ** 3 == length
+    return size
 
 def positions(snake, partial_solution):
     pos = [np.array([0, 0, 0])]
@@ -68,12 +31,7 @@ def positions(snake, partial_solution):
     return np.array(pos)
 
 
-def ok(snake, partial_solution, size):
-    # successive directions should be orthogonal to one another
-    for i in range(partial_solution.shape[0] - 1):
-        if not partial_solution[i, :] @ partial_solution[i + 1, :].T == 0:
-            return False
-
+def valid_partial_solution(snake, partial_solution, size):
     # the snake should fit in a size*size*size cube
     pos = positions(snake, partial_solution)  # (M, 3)
     min_ = np.min(pos, axis=0)  # (3,)
@@ -91,54 +49,23 @@ def ok(snake, partial_solution, size):
     return True
 
 
-def hash_array(arr):
-    return hash((arr.shape, tuple(arr.flatten())))
-
-
-def solve(snake, size, clever_caching):
+def solve_naive(snake):
+    size = snake_size(snake)
     partial_solution = []
-    seen = set()
-    calls = 0  # to keep track of the number of rec calls
-    m = 0
 
     def rec():
-        nonlocal calls
-        calls += 1
-
-        nonlocal m
-        m = max(m, len(partial_solution))
-
-        print(len(partial_solution), m, len(snake), len(seen), calls)
-
         # partial solution is invalid: early exit
-        if not ok(snake, np.array(partial_solution), size):
+        if not valid_partial_solution(snake, np.array(partial_solution), size):
             return False
 
         # solution is complete: early exit
         if len(partial_solution) == len(snake):
             return True
 
-        # clever caching trick
-        if clever_caching:
-            partial_solution_arr = np.array(partial_solution).reshape(-1, 3)
-
-            # we've already processed an equivalent position:
-            # early exit (we know the current position won't work)
-            if hash_array(partial_solution_arr) in seen:
-                return False
-
-            # we add all the equivalent positions to the seen set
-            q = [partial_solution_arr]
-            while q:
-                s = q.pop()
-                if hash_array(s) in seen:
-                    continue
-                seen.add(hash_array(s))
-                for transformation in invariant_transformations:
-                    q.append(partial_solution_arr @ transformation.T)
-
         # try all possible next positions
         for direction in directions:
+            if partial_solution and not partial_solution[-1] @ direction.T == 0:
+                continue
             for coef in [1, -1]:
                 partial_solution.append(coef * direction)
                 if rec():
@@ -149,10 +76,68 @@ def solve(snake, size, clever_caching):
 
     rec()
 
-    print(f"{calls} rec calls")
-
     return np.array(partial_solution)
 
+def solve_fast(snake):
+    size = snake_size(snake)
+    partial_solution = []
+    positions = [(np.array([0, 0, 0]), (0, 0, 0), (0, 0, 0))]
+    positions_set = {(0,0,0)}
+
+    def try_extend_snake(direction):
+        length = snake[len(partial_solution)]
+        res = True
+        pushed = 0
+
+        for _ in range(length):
+            pos, min_, max_ = positions[-1]
+            next_pos = pos + direction
+            next_min = np.min([min_, next_pos], axis=0)
+            next_max = np.max([max_, next_pos], axis=0)
+            if not np.all(next_max - next_min < size):
+                res = False
+                break
+            if tuple(next_pos) in positions_set:
+                res = False
+                break
+            positions.append((next_pos, next_min, next_max))
+            positions_set.add(tuple(next_pos))
+            pushed += 1
+
+        if not res:
+            for _ in range(pushed):
+                pos, _, _ = positions.pop()
+                positions_set.remove(tuple(pos))
+            return False
+
+        partial_solution.append(direction)
+        return True
+
+
+    def rec():
+        if len(partial_solution) == len(snake):
+            return True
+
+        for direction in directions:
+            if partial_solution and not partial_solution[-1] @ direction.T == 0:
+                continue
+            for coef in [1, -1]:
+                if not try_extend_snake(coef * direction):
+                    continue
+                if rec():
+                    return True
+                for _ in range(snake[len(partial_solution) - 1]):
+                    pos, _, _ = positions.pop()
+                    positions_set.remove(tuple(pos))
+                partial_solution.pop()
+
+        return False
+
+    rec()
+
+    assert valid_partial_solution(snake, partial_solution, size)
+    assert len(partial_solution) == len(snake)
+    return np.array(partial_solution)
 
 def show_solution(solution):
     return ",".join(directions_names[tuple(d)] for d in solution)
@@ -160,18 +145,16 @@ def show_solution(solution):
 
 # XXX: debug
 if __name__ == "__main__":
-    snake = [2, 1, 1, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2]
-    size = 3
-    print(sum(snake), size ** 3)
-    print(show_solution(solve(snake, size, True)))
-
     # fmt: off
-    snake = [
-        2, 1, 2, 1, 1, 3, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1,
-        1, 2, 3, 1, 1, 1, 3, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1,
+    snakes = [
+        [1, 1, 1, 1, 1, 1, 1],
+        [2, 1, 1, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2],
+        # [
+        #     2, 1, 2, 1, 1, 3, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1,
+        #     1, 1, 2, 3, 1, 1, 1, 3, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1,
+        # ],
     ]
-    size = 4
     # fmt: on
-    print(sum(snake), size ** 3)
-    # print(show_solution(solve(snake, size, True))
-    print(show_solution(solve(snake, size, False)))
+    for snake in snakes:
+        for solve in [solve_naive, solve_fast]:
+            print(show_solution(solve(snake)))
