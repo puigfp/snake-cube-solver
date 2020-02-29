@@ -1,9 +1,15 @@
 # 3p
-import pytest
 import numpy as np
+import pytest
 
 # local
-from .solver import positions, ok, solve
+from .solver import (
+    positions,
+    snake_size,
+    solve_fast,
+    solve_naive,
+    valid_partial_solution,
+)
 
 
 @pytest.mark.parametrize(
@@ -71,24 +77,22 @@ def test_positions(snake, partial_solution, expected):
         ),
     ],
 )
-def test_ok(snake, partial_solution, size, expected):
-    assert ok(snake, partial_solution, size) == expected
+def test_valid_partial_solution(snake, partial_solution, size, expected):
+    assert valid_partial_solution(snake, partial_solution, size) == expected
 
 
 @pytest.mark.parametrize(
-    "snake,size",
-    [
-        ([1, 1, 1, 1, 1, 1, 1], 2),
-        ([2, 1, 1, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2], 3),
-    ],
+    "snake",
+    [[1, 1, 1, 1, 1, 1, 1], [2, 1, 1, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2]],
 )
 @pytest.mark.parametrize(
-    "clever_caching", [True, False],
+    "solve", [solve_naive, solve_fast],
 )
-def test_solve(snake, size, clever_caching):
-    solution = solve(snake, size, clever_caching)
+def test_solve(snake, solve):
+    size = snake_size(snake)
+    solution = solve(snake)
     # the solution should be a valid partial solution
-    assert ok(snake, solution, size)
+    assert valid_partial_solution(snake, solution, size)
     # the solution shouldn't be partial, ie, all segments should have an orientation
     assert solution.shape[0] == len(snake)
     # the solution should fill the entirety of the size * size * size cube
