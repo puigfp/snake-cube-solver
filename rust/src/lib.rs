@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt;
 
 #[cfg(test)]
@@ -11,6 +12,7 @@ pub enum Orientation {
 }
 
 // Direction = Orientation + coef (+1 or -1)
+#[derive(Clone)]
 pub struct Direction(Orientation, isize);
 
 impl Direction {
@@ -142,4 +144,122 @@ fn solve_rec(
     }
 
     false
+}
+
+pub fn solve_2(snake: &Vec<usize>) -> Vec<Direction> {
+    let mut partial_solution: Vec<Direction> = vec![];
+    let mut snake_positions = vec![([0, 0, 0], [0, 0, 0], [0, 0, 0])];
+    let mut snake_positions_set = HashSet::new();
+    snake_positions_set.insert([0, 0, 0]);
+    let size = snake_size(snake);
+    solve_rec_2(
+        snake,
+        size,
+        &mut partial_solution,
+        &mut snake_positions,
+        &mut snake_positions_set,
+    );
+    if !valid_partial_solution(snake, size, &partial_solution) {
+        panic!("invalid solution");
+    }
+    partial_solution
+}
+
+pub fn solve_rec_2(
+    snake: &Vec<usize>,
+    size: usize,
+    partial_solution: &mut Vec<Direction>,
+    snake_positions: &mut Vec<([isize; 3], [isize; 3], [isize; 3])>,
+    snake_positions_set: &mut HashSet<[isize; 3]>,
+) -> bool {
+    if partial_solution.len() == snake.len() {
+        return true;
+    }
+
+    use Orientation::*;
+    for o in &[Front, Right, Up] {
+        if partial_solution.len() >= 1
+            && !orthogonal(&partial_solution[partial_solution.len() - 1].0, o)
+        {
+            continue;
+        }
+        for d in &[1, -1] {
+            if !try_extend_snake(
+                snake,
+                size,
+                partial_solution,
+                snake_positions,
+                snake_positions_set,
+                Direction(o.clone(), *d),
+            ) {
+                continue;
+            }
+
+            if solve_rec_2(
+                snake,
+                size,
+                partial_solution,
+                snake_positions,
+                snake_positions_set,
+            ) {
+                return true;
+            }
+
+            for _ in 0..snake[partial_solution.len() - 1] {
+                let (pos, _, _) = snake_positions.pop().unwrap();
+                snake_positions_set.remove(&pos);
+            }
+            partial_solution.pop();
+        }
+    }
+
+    false
+}
+
+fn try_extend_snake(
+    snake: &Vec<usize>,
+    size: usize,
+    partial_solution: &mut Vec<Direction>,
+    snake_positions: &mut Vec<([isize; 3], [isize; 3], [isize; 3])>,
+    snake_positions_set: &mut HashSet<[isize; 3]>,
+    direction: Direction,
+) -> bool {
+    let length = snake[partial_solution.len()];
+    let Direction(o, d) = direction.clone();
+
+    let mut res = true;
+    let mut pushed = 0;
+
+    'append: for _ in 0..length {
+        let (pos, min, max) = snake_positions[snake_positions.len() - 1];
+        let next_pos = add(pos, scale(d, delta_orientation(&o)));
+        let mut next_min = [0, 0, 0];
+        let mut next_max = [0, 0, 0];
+        for i in 0..3 {
+            next_min[i] = min[i].min(next_pos[i]);
+            next_max[i] = max[i].max(next_pos[i]);
+            if !(next_max[i] - next_min[i] < size as isize) {
+                res = false;
+                break 'append;
+            }
+        }
+        if snake_positions_set.contains(&next_pos) {
+            res = false;
+            break 'append;
+        }
+        snake_positions.push((next_pos, next_min, next_max));
+        snake_positions_set.insert(next_pos);
+        pushed += 1;
+    }
+
+    if !res {
+        for _ in 0..pushed {
+            let (pos, _, _) = snake_positions.pop().unwrap();
+            snake_positions_set.remove(&pos);
+        }
+    }
+    if res {
+        partial_solution.push(direction);
+    }
+    res
 }

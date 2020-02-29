@@ -11,14 +11,16 @@ fn main() {
         ],
     ];
     for snake in cases.iter() {
-        let solution = solve(snake);
-        println!(
-            "{}",
-            solution
-                .iter()
-                .map(|direction| format!("{}", direction))
-                .collect::<Vec<_>>()
-                .join(",")
-        );
+        for f in &[solve_2] {
+            let solution = f(snake);
+            println!(
+                "{}",
+                solution
+                    .iter()
+                    .map(|direction| format!("{}", direction))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        }
     }
 }
