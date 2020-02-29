@@ -11,7 +11,7 @@ fn main() {
         ],
     ];
     for snake in cases.iter() {
-        for f in &[solve_2] {
+        for f in &[solve_naive, solve_fast] {
             let solution = f(snake);
             println!(
                 "{}",

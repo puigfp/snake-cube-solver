@@ -106,14 +106,14 @@ fn valid_partial_solution(
     true
 }
 
-pub fn solve(snake: &Vec<usize>) -> Vec<Direction> {
+pub fn solve_naive(snake: &Vec<usize>) -> Vec<Direction> {
     let mut partial_solution: Vec<Direction> = vec![];
     let size = snake_size(snake);
-    solve_rec(snake, size, &mut partial_solution);
+    solve_naive_rec(snake, size, &mut partial_solution);
     partial_solution
 }
 
-fn solve_rec(
+fn solve_naive_rec(
     snake: &Vec<usize>,
     size: usize,
     partial_solution: &mut Vec<Direction>,
@@ -136,7 +136,7 @@ fn solve_rec(
         }
         for d in &[1, -1] {
             partial_solution.push(Direction(o.clone(), *d));
-            if solve_rec(snake, size, partial_solution) {
+            if solve_naive_rec(snake, size, partial_solution) {
                 return true;
             }
             partial_solution.pop();
@@ -146,26 +146,25 @@ fn solve_rec(
     false
 }
 
-pub fn solve_2(snake: &Vec<usize>) -> Vec<Direction> {
+pub fn solve_fast(snake: &Vec<usize>) -> Vec<Direction> {
     let mut partial_solution: Vec<Direction> = vec![];
     let mut snake_positions = vec![([0, 0, 0], [0, 0, 0], [0, 0, 0])];
     let mut snake_positions_set = HashSet::new();
     snake_positions_set.insert([0, 0, 0]);
     let size = snake_size(snake);
-    solve_rec_2(
+    solve_fast_rec(
         snake,
         size,
         &mut partial_solution,
         &mut snake_positions,
         &mut snake_positions_set,
     );
-    if !valid_partial_solution(snake, size, &partial_solution) {
-        panic!("invalid solution");
-    }
+    assert!(valid_partial_solution(snake, size, &partial_solution));
+    assert!(partial_solution.len() == snake.len());
     partial_solution
 }
 
-pub fn solve_rec_2(
+pub fn solve_fast_rec(
     snake: &Vec<usize>,
     size: usize,
     partial_solution: &mut Vec<Direction>,
@@ -195,7 +194,7 @@ pub fn solve_rec_2(
                 continue;
             }
 
-            if solve_rec_2(
+            if solve_fast_rec(
                 snake,
                 size,
                 partial_solution,
@@ -233,33 +232,39 @@ fn try_extend_snake(
     'append: for _ in 0..length {
         let (pos, min, max) = snake_positions[snake_positions.len() - 1];
         let next_pos = add(pos, scale(d, delta_orientation(&o)));
+
+        // compute next rolling min/max values
         let mut next_min = [0, 0, 0];
         let mut next_max = [0, 0, 0];
         for i in 0..3 {
             next_min[i] = min[i].min(next_pos[i]);
             next_max[i] = max[i].max(next_pos[i]);
+            // early exit: we're using too much space
             if !(next_max[i] - next_min[i] < size as isize) {
                 res = false;
                 break 'append;
             }
         }
+        // early exit: collision
         if snake_positions_set.contains(&next_pos) {
             res = false;
             break 'append;
         }
+        // ok
         snake_positions.push((next_pos, next_min, next_max));
         snake_positions_set.insert(next_pos);
         pushed += 1;
     }
 
+    // there was an early exit, remove the positions we inserted
     if !res {
         for _ in 0..pushed {
             let (pos, _, _) = snake_positions.pop().unwrap();
             snake_positions_set.remove(&pos);
         }
+        return false;
     }
-    if res {
-        partial_solution.push(direction);
-    }
-    res
+
+    partial_solution.push(direction);
+    true
 }
