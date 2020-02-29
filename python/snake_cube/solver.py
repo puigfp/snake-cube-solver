@@ -1,3 +1,6 @@
+# std
+import sys
+
 # 3p
 import numpy as np
 
@@ -143,18 +146,7 @@ def show_solution(solution):
     return ",".join(directions_names[tuple(d)] for d in solution)
 
 
-# XXX: debug
 if __name__ == "__main__":
-    # fmt: off
-    snakes = [
-        [1, 1, 1, 1, 1, 1, 1],
-        [2, 1, 1, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2],
-        # [
-        #     2, 1, 2, 1, 1, 3, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1,
-        #     1, 1, 2, 3, 1, 1, 1, 3, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1,
-        # ],
-    ]
-    # fmt: on
-    for snake in snakes:
-        for solve in [solve_naive, solve_fast]:
-            print(show_solution(solve(snake)))
+    assert len(sys.argv) == 2
+    snake = [int(s.strip()) for s in sys.argv[1].split(",")]
+    print(show_solution(solve_fast(snake)))
